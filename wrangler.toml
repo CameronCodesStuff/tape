@@ -1,0 +1,12 @@
+name = "trader"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+# "paper" = fake money sandbox (default, START HERE)
+# "live"  = REAL MONEY through your funded Alpaca account
+MODE = "paper"
+
+# Hard server-side guardrails — enforced even on autopilot
+MAX_NOTIONAL = "200"        # max USD per single order
+MAX_TRADES_PER_DAY = "20"   # max orders per UTC day (best-effort)

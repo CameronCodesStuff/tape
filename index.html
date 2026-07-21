@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tape — trading terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#080c16;         /* page */
+  --panel:#0d1322;       /* cards */
+  --edge:#1b2540;        /* borders */
+  --cyan:#2ee6ff;        /* primary / buy */
+  --magenta:#ff3d81;     /* sell / live danger */
+  --amber:#ffb347;       /* warnings */
+  --text:#c9d6ee;
+  --dim:#5f6f92;
+  --up:#2ee6a8;
+  --down:#ff5d73;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px}
+h1,h2,.display{font-family:'Michroma',sans-serif;letter-spacing:.08em}
+button{font-family:inherit;cursor:pointer;border:1px solid var(--edge);background:#131b30;color:var(--text);padding:8px 14px;border-radius:4px;transition:box-shadow .15s,border-color .15s}
+button:hover{border-color:var(--cyan);box-shadow:0 0 12px rgba(46,230,255,.25)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+input,select{background:#0a101f;border:1px solid var(--edge);color:var(--text);padding:8px 10px;border-radius:4px;font-family:inherit;width:100%}
+label{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em;display:block;margin-bottom:4px}
+
+/* ---------- shell ---------- */
+header{display:flex;align-items:center;gap:18px;padding:14px 20px;border-bottom:1px solid var(--edge);flex-wrap:wrap}
+header h1{font-size:18px;color:#fff;text-transform:lowercase}
+h1 .cur{color:var(--cyan);text-shadow:0 0 14px rgba(46,230,255,.8);animation:blink 1.2s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion: reduce){h1 .cur{animation:none}}
+.badge{font-size:11px;letter-spacing:.2em;padding:4px 10px;border-radius:3px;border:1px solid}
+.badge.paper{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(46,230,255,.35) inset}
+.badge.live{color:var(--magenta);border-color:var(--magenta);box-shadow:0 0 10px rgba(255,61,129,.45) inset;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 18px rgba(255,61,129,.8) inset}}
+.acct{display:flex;gap:26px;margin-left:auto;text-align:right}
+.acct .k{font-size:10px;color:var(--dim);letter-spacing:.15em;text-transform:uppercase}
+.acct .v{font-size:17px;color:#fff}
+.acct .v.up{color:var(--up)}.acct .v.down{color:var(--down)}
+
+/* ---------- ticker tape (signature) ---------- */
+#tape{overflow:hidden;border-bottom:1px solid var(--edge);background:#0a0f1d;white-space:nowrap}
+#tapeInner{display:inline-block;padding:7px 0;animation:tape 40s linear infinite}
+@media (prefers-reduced-motion: reduce){#tapeInner{animation:none}}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tk{margin:0 26px;font-size:12px}
+.tk b{color:#fff}.tk .up{color:var(--up)}.tk .down{color:var(--down)}
+
+main{display:grid;grid-template-columns:280px 1fr 330px;gap:14px;padding:14px 20px;align-items:start}
+@media(max-width:1100px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--edge);border-radius:6px;padding:14px}
+.panel h2{font-size:11px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-bottom:12px}
+
+/* watchlist */
+.wrow{display:flex;justify-content:space-between;align-items:center;padding:7px 8px;border-radius:4px;cursor:pointer}
+.wrow:hover,.wrow.sel{background:#131b30}
+.wrow.sel{border-left:2px solid var(--cyan)}
+.wrow .sym{color:#fff}
+.wrow .px{font-size:12px}
+.wrow .chg{font-size:11px;min-width:58px;text-align:right}
+.up{color:var(--up)}.down{color:var(--down)}
+.addrow{display:flex;gap:6px;margin-top:10px}
+
+/* chart */
+#chart{width:100%;height:340px;display:block}
+.chartHead{display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap}
+.chartHead .big{font-size:22px;color:#fff}
+.tfs{margin-left:auto;display:flex;gap:6px}
+.tfs button{padding:4px 10px;font-size:11px}
+.tfs button.on{border-color:var(--cyan);color:var(--cyan)}
+
+/* order ticket */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sideBtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.sideBtns .buy.on{border-color:var(--up);color:var(--up);box-shadow:0 0 12px rgba(46,230,168,.3)}
+.sideBtns .sell.on{border-color:var(--down);color:var(--down);box-shadow:0 0 12px rgba(255,93,115,.3)}
+#placeBtn{width:100%;margin-top:12px;padding:11px;font-family:'Michroma';font-size:12px;letter-spacing:.15em}
+#placeBtn.buy{border-color:var(--up);color:var(--up)}
+#placeBtn.sell{border-color:var(--down);color:var(--down)}
+
+/* AI panel */
+#aiCard{border:1px solid var(--edge);border-radius:5px;padding:12px;margin-top:10px;display:none}
+#aiCard.buy{border-color:var(--up)}#aiCard.sell{border-color:var(--down)}#aiCard.hold{border-color:var(--amber)}
+#aiAction{font-family:'Michroma';font-size:15px;letter-spacing:.15em}
+#aiCard .conf{float:right;color:var(--dim)}
+#aiCard p{font-size:12px;line-height:1.6;margin-top:8px;color:var(--text)}
+#aiCard .risk{color:var(--amber)}
+.auto{margin-top:14px;border-top:1px dashed var(--edge);padding-top:12px}
+.auto .row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.switch{position:relative;width:44px;height:22px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#131b30;border:1px solid var(--edge);border-radius:22px;transition:.2s}
+.slider:before{content:"";position:absolute;width:16px;height:16px;left:2px;top:2px;background:var(--dim);border-radius:50%;transition:.2s}
+.switch input:checked + .slider{border-color:var(--magenta);box-shadow:0 0 12px rgba(255,61,129,.5)}
+.switch input:checked + .slider:before{transform:translateX(21px);background:var(--magenta)}
+#log{max-height:150px;overflow:auto;font-size:11px;color:var(--dim);margin-top:8px;line-height:1.7}
+#log .t{color:#3a466a}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{color:var(--dim);text-transform:uppercase;font-size:10px;letter-spacing:.12em;text-align:left;padding:6px 8px;border-bottom:1px solid var(--edge)}
+td{padding:7px 8px;border-bottom:1px solid #101830}
+tr:last-child td{border-bottom:none}
+.wide{grid-column:1 / -1}
+.xbtn{padding:3px 8px;font-size:11px}
+.note{font-size:11px;color:var(--dim);line-height:1.6;margin-top:10px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#131b30;border:1px solid var(--cyan);padding:10px 18px;border-radius:5px;display:none;z-index:50;max-width:90vw}
+#toast.err{border-color:var(--down);color:var(--down)}
+
+/* setup modal */
+#setup{position:fixed;inset:0;background:rgba(4,6,12,.92);display:flex;align-items:center;justify-content:center;z-index:100}
+#setup .panel{width:min(420px,92vw)}
+#setup h1{font-size:16px;margin-bottom:6px}
+#setup .panel > p{font-size:12px;color:var(--dim);margin-bottom:14px;line-height:1.6}
+#setup label{margin-top:10px}
+#setup button{width:100%;margin-top:16px}
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div class="panel">
+    <h1>tape<span class="cur">_</span></h1>
+    <p>Point the dashboard at your deployed Cloudflare Worker and enter the auth key you set as a secret. Saved locally in this browser only.</p>
+    <label>Worker URL</label>
+    <input id="setupUrl" value="https://trader.detlaffcameron.workers.dev">
+    <label>Auth key</label>
+    <input id="setupKey" type="password" placeholder="the AUTH_KEY secret">
+    <button onclick="saveSetup()">Connect</button>
+  </div>
+</div>
+
+<header>
+  <h1>tape<span class="cur">_</span></h1>
+  <span id="modeBadge" class="badge paper">PAPER</span>
+  <div class="acct">
+    <div><div class="k">Equity</div><div class="v" id="equity">—</div></div>
+    <div><div class="k">Buying power</div><div class="v" id="bp">—</div></div>
+    <div><div class="k">Day P/L</div><div class="v" id="dayPl">—</div></div>
+    <button class="xbtn" style="align-self:center" onclick="resetSetup()" title="Change worker / key">⚙</button>
+  </div>
+</header>
+
+<div id="tape"><div id="tapeInner"></div></div>
+
+<main>
+  <!-- watchlist -->
+  <section class="panel">
+    <h2>Watchlist</h2>
+    <div id="watch"></div>
+    <div class="addrow">
+      <input id="addSym" placeholder="AAPL or BTC/USD" style="text-transform:uppercase">
+      <button onclick="addSymbol()">+</button>
+    </div>
+    <p class="note">Stocks use plain tickers (NVDA). Crypto uses pair form (ETH/USD).</p>
+  </section>
+
+  <!-- chart + positions -->
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <div class="panel">
+      <div class="chartHead">
+        <span class="big display" id="chSym">—</span>
+        <span id="chPx" class="big">—</span>
+        <span id="chChg"></span>
+        <div class="tfs">
+          <button data-tf="15Min">15m</button>
+          <button data-tf="1Hour" class="on">1H</button>
+          <button data-tf="1Day">1D</button>
+        </div>
+      </div>
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>Positions</h2>
+      <table><thead><tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>Now</th><th>P/L</th><th></th></tr></thead>
+      <tbody id="posBody"><tr><td colspan="6" style="color:var(--dim)">No open positions</td></tr></tbody></table>
+    </div>
+
+    <div class="panel">
+      <h2>Orders</h2>
+      <table><thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty/$</th><th>Status</th><th></th></tr></thead>
+      <tbody id="ordBody"><tr><td colspan="6" style="color:var(--dim)">No orders yet</td></tr></tbody></table>
+    </div>
+  </section>
+
+  <!-- right column -->
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <div class="panel">
+      <h2>Order ticket</h2>
+      <div class="sideBtns">
+        <button class="buy on" id="btnBuy" onclick="setSide('buy')">BUY</button>
+        <button class="sell" id="btnSell" onclick="setSide('sell')">SELL</button>
+      </div>
+      <div class="grid2">
+        <div><label>Type</label>
+          <select id="oType" onchange="document.getElementById('limitWrap').style.display=this.value==='limit'?'block':'none'">
+            <option value="market">Market</option><option value="limit">Limit</option>
+          </select></div>
+        <div><label>Size in</label>
+          <select id="oMode"><option value="notional">Dollars</option><option value="qty">Quantity</option></select></div>
+      </div>
+      <div style="margin-top:10px"><label>Amount</label><input id="oAmt" type="number" min="0" step="any" placeholder="50"></div>
+      <div id="limitWrap" style="display:none;margin-top:10px"><label>Limit price</label><input id="oLimit" type="number" min="0" step="any"></div>
+      <button id="placeBtn" class="buy" onclick="placeManual()">BUY — SUBMIT</button>
+      <p class="note" id="limitsNote"></p>
+    </div>
+
+    <div class="panel">
+      <h2>AI Analyst</h2>
+      <button style="width:100%" onclick="runAnalysis()" id="anBtn">Analyze <span id="anSym">—</span></button>
+      <div id="aiCard">
+        <span id="aiAction"></span><span class="conf" id="aiConf"></span>
+        <p id="aiWhy"></p>
+        <p class="risk" id="aiRisk"></p>
+        <button style="width:100%;margin-top:10px" id="aiExec" onclick="execAi()">Execute suggestion</button>
+      </div>
+
+      <div class="auto">
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="autoTgl" onchange="toggleAuto()"><span class="slider"></span></label>
+          <div><b class="display" style="font-size:12px">AUTOPILOT</b>
+          <div style="font-size:11px;color:var(--dim)">Scans watchlist, trades when confident</div></div>
+        </div>
+        <div class="grid2">
+          <div><label>Min confidence</label><input id="autoConf" type="number" value="75" min="50" max="99"></div>
+          <div><label>Scan every (min)</label><input id="autoMins" type="number" value="15" min="2"></div>
+        </div>
+        <div id="log"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+// ---------------- state ----------------
+const DEFAULT_WORKER = "https://trader.detlaffcameron.workers.dev";
+let CFG = { url: localStorage.getItem("nt_url") || DEFAULT_WORKER, key: localStorage.getItem("nt_key") || "" };
+let SERVER = { mode: "paper", max_notional: 200, max_trades_per_day: 20 };
+let watch = JSON.parse(localStorage.getItem("nt_watch") || '["AAPL","NVDA","TSLA","BTC/USD","ETH/USD"]');
+let selected = watch[0], side = "buy", tf = "1Hour";
+let quotes = {}, lastAi = null, autoTimer = null, bars = [];
+
+const $ = id => document.getElementById(id);
+const fmt$ = n => n == null || isNaN(n) ? "—" : Number(n).toLocaleString("en-US",{style:"currency",currency:"USD"});
+const toast = (m, err) => { const t=$("toast"); t.textContent=m; t.className=err?"err":""; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none",4200); };
+
+async function api(path, opts={}) {
+  const res = await fetch(CFG.url.replace(/\/$/,"") + path, {
+    ...opts,
+    headers: { "Content-Type":"application/json", "X-Auth-Key": CFG.key, ...(opts.headers||{}) },
+  });
+  const data = await res.json().catch(()=>({}));
+  if (!res.ok) throw new Error(data.error || res.status);
+  return data;
+}
+
+// ---------------- setup ----------------
+function saveSetup(){
+  CFG.url = $("setupUrl").value.trim(); CFG.key = $("setupKey").value;
+  localStorage.setItem("nt_url", CFG.url); localStorage.setItem("nt_key", CFG.key);
+  $("setup").style.display="none"; boot();
+}
+function resetSetup(){ $("setup").style.display="flex"; $("setupUrl").value=CFG.url; }
+if (CFG.url && CFG.key) { $("setup").style.display="none"; boot(); }
+
+async function boot(){
+  try {
+    SERVER = await api("/api/config");
+    const b = $("modeBadge");
+    b.textContent = SERVER.mode.toUpperCase();
+    b.className = "badge " + SERVER.mode;
+    if (SERVER.mode === "live") toast("⚠ LIVE MODE — orders use real money", true);
+    $("limitsNote").textContent = `Server caps: ${fmt$(SERVER.max_notional)} per order · ${SERVER.max_trades_per_day} orders/day`;
+  } catch(e){ toast("Can't reach worker: " + e.message, true); resetSetup(); return; }
+  refreshAccount(); refreshPositions(); refreshOrders();
+  renderWatch(); select(selected);
+  setInterval(refreshAccount, 30000);
+  setInterval(refreshQuotes, 20000);
+  setInterval(refreshPositions, 30000);
+  refreshQuotes();
+}
+
+// ---------------- account ----------------
+async function refreshAccount(){
+  try {
+    const a = await api("/api/account");
+    $("equity").textContent = fmt$(a.equity);
+    $("bp").textContent = fmt$(a.buying_power);
+    const pl = a.equity - a.last_equity;
+    const el = $("dayPl");
+    el.textContent = (pl>=0?"+":"") + fmt$(pl).replace("-","");
+    el.className = "v " + (pl>=0?"up":"down");
+  } catch(e){}
+}
+
+// ---------------- watchlist / quotes ----------------
+function renderWatch(){
+  $("watch").innerHTML = watch.map(s => {
+    const q = quotes[s];
+    const chg = q?.dailyBar && q?.prevDailyBar ? (q.price/q.prevDailyBar.c - 1)*100 : null;
+    return `<div class="wrow ${s===selected?"sel":""}" onclick="select('${s}')">
+      <span class="sym">${s}</span>
+      <span class="px">${q?fmt$(q.price):"…"}</span>
+      <span class="chg ${chg>=0?"up":"down"}">${chg==null?"":(chg>=0?"+":"")+chg.toFixed(2)+"%"}</span>
+    </div>`;
+  }).join("");
+  $("tapeInner").innerHTML = (watch.concat(watch)).map(s=>{
+    const q=quotes[s]; const chg=q?.prevDailyBar?(q.price/q.prevDailyBar.c-1)*100:0;
+    return `<span class="tk"><b>${s}</b> ${q?fmt$(q.price):""} <span class="${chg>=0?"up":"down"}">${(chg>=0?"▲":"▼")} ${Math.abs(chg).toFixed(2)}%</span></span>`;
+  }).join("");
+}
+async function refreshQuotes(){
+  for (const s of watch) {
+    try { quotes[s] = await api("/api/snapshot?symbol="+encodeURIComponent(s)); } catch(e){}
+  }
+  renderWatch();
+  if (quotes[selected]) updateChartHead();
+}
+function addSymbol(){
+  const s = $("addSym").value.trim().toUpperCase();
+  if (!s || watch.includes(s)) return;
+  watch.push(s); localStorage.setItem("nt_watch", JSON.stringify(watch));
+  $("addSym").value=""; renderWatch(); refreshQuotes();
+}
+function select(s){ selected=s; $("anSym").textContent=s; renderWatch(); loadChart(); }
+
+// ---------------- chart ----------------
+document.querySelectorAll(".tfs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tfs button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); tf=b.dataset.tf; loadChart();
+});
+function updateChartHead(){
+  const q=quotes[selected]; if(!q) return;
+  $("chSym").textContent=selected; $("chPx").textContent=fmt$(q.price);
+  const chg=q.prevDailyBar?(q.price/q.prevDailyBar.c-1)*100:null;
+  $("chChg").textContent=chg==null?"":(chg>=0?"+":"")+chg.toFixed(2)+"% today";
+  $("chChg").className=chg>=0?"up":"down";
+}
+async function loadChart(){
+  $("chSym").textContent=selected;
+  try { bars=(await api(`/api/bars?symbol=${encodeURIComponent(selected)}&timeframe=${tf}`)).bars||[]; drawChart(); }
+  catch(e){ bars=[]; drawChart(); }
+  updateChartHead();
+}
+function drawChart(){
+  const c=$("chart"), dpr=devicePixelRatio||1;
+  const W=c.clientWidth, H=340;
+  c.width=W*dpr; c.height=H*dpr;
+  const x=c.getContext("2d"); x.scale(dpr,dpr);
+  x.clearRect(0,0,W,H);
+  if(!bars.length){ x.fillStyle="#5f6f92"; x.fillText("No data",W/2-20,H/2); return; }
+  const lo=Math.min(...bars.map(b=>b.l)), hi=Math.max(...bars.map(b=>b.h));
+  const px=v=>H-14-((v-lo)/(hi-lo||1))*(H-28);
+  const bw=Math.max(2,(W-50)/bars.length*0.65), step=(W-50)/bars.length;
+  // grid
+  x.strokeStyle="#131b30"; x.fillStyle="#5f6f92"; x.font="10px JetBrains Mono";
+  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=px(v);
+    x.beginPath(); x.moveTo(0,y); x.lineTo(W-50,y); x.stroke();
+    x.fillText(v>=1000?v.toFixed(0):v.toFixed(2), W-46, y+3); }
+  bars.forEach((b,i)=>{
+    const cx=i*step+step/2, up=b.c>=b.o;
+    x.strokeStyle=x.fillStyle=up?"#2ee6a8":"#ff5d73";
+    x.beginPath(); x.moveTo(cx,px(b.h)); x.lineTo(cx,px(b.l)); x.stroke();
+    const y1=px(Math.max(b.o,b.c)), y2=px(Math.min(b.o,b.c));
+    x.fillRect(cx-bw/2, y1, bw, Math.max(1,y2-y1));
+  });
+  // glow line at last close
+  const last=bars[bars.length-1];
+  x.strokeStyle="rgba(46,230,255,.7)"; x.setLineDash([4,4]);
+  x.beginPath(); x.moveTo(0,px(last.c)); x.lineTo(W-50,px(last.c)); x.stroke(); x.setLineDash([]);
+}
+addEventListener("resize", drawChart);
+
+// ---------------- manual orders ----------------
+function setSide(s){ side=s;
+  $("btnBuy").classList.toggle("on",s==="buy"); $("btnSell").classList.toggle("on",s==="sell");
+  const p=$("placeBtn"); p.className=s; p.textContent=s.toUpperCase()+" — SUBMIT";
+}
+async function placeManual(){
+  const amt=Number($("oAmt").value);
+  if(!amt) return toast("Enter an amount", true);
+  const body={ symbol:selected, side, type:$("oType").value };
+  if($("oMode").value==="notional") body.notional=amt; else { body.qty=amt; body.est_price=quotes[selected]?.price||0; }
+  if(body.type==="limit") body.limit_price=Number($("oLimit").value);
+  if (SERVER.mode==="live" && !confirm(`LIVE order: ${side.toUpperCase()} ${selected} for ${$("oMode").value==="notional"?fmt$(amt):amt+" units"}. Real money. Continue?`)) return;
+  try { const o=await api("/api/orders",{method:"POST",body:JSON.stringify(body)});
+    toast(`Order ${o.status||"sent"}: ${side} ${selected}`); refreshOrders(); refreshPositions(); }
+  catch(e){ toast(e.message, true); }
+}
+
+// ---------------- positions / orders ----------------
+async function refreshPositions(){
+  try {
+    const ps=await api("/api/positions");
+    $("posBody").innerHTML = ps.length ? ps.map(p=>{
+      const pl=Number(p.unrealized_pl);
+      return `<tr><td>${p.symbol}</td><td>${Number(p.qty).toFixed(4)}</td><td>${fmt$(p.avg_entry_price)}</td><td>${fmt$(p.current_price)}</td>
+      <td class="${pl>=0?"up":"down"}">${(pl>=0?"+":"")+fmt$(pl).replace("-","")}</td>
+      <td><button class="xbtn" onclick="closePos('${p.symbol}','${p.qty}')">Close</button></td></tr>`;
+    }).join("") : `<tr><td colspan="6" style="color:var(--dim)">No open positions</td></tr>`;
+  } catch(e){}
+}
+async function closePos(sym, qty){
+  const display = sym.length>5 && !sym.includes("/") ? sym.replace(/(USD[TC]?)$/,"/$1") : sym;
+  if (SERVER.mode==="live" && !confirm(`Close ${sym} (${qty}) with a live market order?`)) return;
+  try { await api("/api/orders",{method:"POST",body:JSON.stringify({symbol:display,side:"sell",type:"market",qty,est_price:0})});
+    toast("Close order sent"); refreshPositions(); refreshOrders(); }
+  catch(e){ toast(e.message,true); }
+}
+async function refreshOrders(){
+  try {
+    const os=await api("/api/orders");
+    $("ordBody").innerHTML = os.length ? os.slice(0,12).map(o=>`
+      <tr><td>${new Date(o.submitted_at).toLocaleTimeString()}</td><td>${o.symbol}</td>
+      <td class="${o.side==="buy"?"up":"down"}">${o.side}</td>
+      <td>${o.notional?fmt$(o.notional):o.qty}</td><td>${o.status}</td>
+      <td>${["new","accepted","pending_new"].includes(o.status)?`<button class="xbtn" onclick="cancelOrder('${o.id}')">✕</button>`:""}</td></tr>`).join("")
+      : `<tr><td colspan="6" style="color:var(--dim)">No orders yet</td></tr>`;
+  } catch(e){}
+}
+async function cancelOrder(id){ try{ await api("/api/orders/"+id,{method:"DELETE"}); toast("Cancelled"); refreshOrders(); }catch(e){ toast(e.message,true);} }
+
+// ---------------- AI ----------------
+async function runAnalysis(sym){
+  const target = sym || selected;
+  $("anBtn").disabled=true; $("anBtn").firstChild.textContent="Analyzing ";
+  try {
+    const a = await api("/api/analyze",{method:"POST",body:JSON.stringify({symbol:target})});
+    lastAi=a; const card=$("aiCard");
+    card.style.display="block"; card.className=a.action;
+    $("aiAction").textContent=a.action.toUpperCase()+" "+a.symbol;
+    $("aiAction").style.color=a.action==="buy"?"var(--up)":a.action==="sell"?"var(--down)":"var(--amber)";
+    $("aiConf").textContent=a.confidence+"% conf";
+    $("aiWhy").textContent=a.reasoning;
+    $("aiRisk").textContent="Risk: "+a.risk_notes;
+    $("aiExec").style.display=a.action==="hold"?"none":"block";
+    $("aiExec").textContent=`Execute: ${a.action} ${fmt$(Math.min(a.suggested_notional_usd, SERVER.max_notional))}`;
+    return a;
+  } catch(e){ toast("Analysis failed: "+e.message, true); return null; }
+  finally { $("anBtn").disabled=false; $("anBtn").firstChild.textContent="Analyze "; }
+}
+async function execAi(){
+  if(!lastAi||lastAi.action==="hold") return;
+  const notional=Math.min(lastAi.suggested_notional_usd, SERVER.max_notional);
+  if (SERVER.mode==="live" && !confirm(`LIVE: ${lastAi.action.toUpperCase()} ${lastAi.symbol} ${fmt$(notional)} — real money. Continue?`)) return;
+  try {
+    if (lastAi.action==="sell") {
+      const ps=await api("/api/positions");
+      const p=ps.find(x=>x.symbol===lastAi.symbol.replace("/",""));
+      if(!p) return toast("Nothing to sell for "+lastAi.symbol, true);
+      await api("/api/orders",{method:"POST",body:JSON.stringify({symbol:lastAi.symbol,side:"sell",type:"market",qty:p.qty,est_price:0})});
+    } else {
+      await api("/api/orders",{method:"POST",body:JSON.stringify({symbol:lastAi.symbol,side:"buy",type:"market",notional})});
+    }
+    toast("AI order sent: "+lastAi.action+" "+lastAi.symbol);
+    refreshOrders(); refreshPositions();
+  } catch(e){ toast(e.message,true); }
+}
+
+// ---------------- autopilot ----------------
+function log(m){ const l=$("log"); l.innerHTML=`<div><span class="t">${new Date().toLocaleTimeString()}</span> ${m}</div>`+l.innerHTML; }
+function toggleAuto(){
+  clearInterval(autoTimer);
+  if ($("autoTgl").checked) {
+    if (SERVER.mode==="live" && !confirm("Autopilot in LIVE mode will place REAL-MONEY orders automatically while this tab stays open, within the server's caps. Are you sure?")) {
+      $("autoTgl").checked=false; return;
+    }
+    log("Autopilot engaged ("+SERVER.mode+" mode)");
+    autoCycle();
+    autoTimer=setInterval(autoCycle, Math.max(2,Number($("autoMins").value))*60000);
+  } else { log("Autopilot disengaged"); }
+}
+let scanIdx=0;
+async function autoCycle(){
+  const sym=watch[scanIdx++ % watch.length];
+  log("Scanning "+sym+"…");
+  const a=await runAnalysis(sym);
+  if(!a) return;
+  const min=Number($("autoConf").value)||75;
+  if(a.action==="hold" || a.confidence<min){ log(`${sym}: ${a.action} @ ${a.confidence}% — no trade`); return; }
+  log(`${sym}: ${a.action.toUpperCase()} @ ${a.confidence}% — executing`);
+  lastAi=a;
+  // in live mode autopilot still bypasses confirm dialogs by design — the caps protect you
+  const notional=Math.min(a.suggested_notional_usd, SERVER.max_notional);
+  try {
+    if (a.action==="sell") {
+      const ps=await api("/api/positions");
+      const p=ps.find(x=>x.symbol===a.symbol.replace("/",""));
+      if(!p){ log("No position to sell"); return; }
+      await api("/api/orders",{method:"POST",body:JSON.stringify({symbol:a.symbol,side:"sell",type:"market",qty:p.qty,est_price:0})});
+    } else {
+      await api("/api/orders",{method:"POST",body:JSON.stringify({symbol:a.symbol,side:"buy",type:"market",notional})});
+    }
+    log("Order sent ✓"); refreshOrders(); refreshPositions();
+  } catch(e){ log("Blocked/failed: "+e.message); }
+}
+</script>
+</body>
+</html>
