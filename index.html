@@ -281,6 +281,16 @@ async function boot(){
     b.className = "badge " + SERVER.mode;
     if (SERVER.mode === "live") toast("⚠ LIVE MODE — orders use real money", true);
     $("limitsNote").textContent = `Server caps: ${fmt$(SERVER.max_notional)} per order · ${SERVER.max_trades_per_day} orders/day`;
+    if (!SERVER.ai_enabled) {
+      $("anBtn").disabled = true;
+      $("anBtn").textContent = "AI disabled";
+      $("autoTgl").disabled = true;
+      $("autoTgl").checked = false;
+      const note = document.createElement("p");
+      note.className = "note";
+      note.textContent = "Manual trading only. To enable the AI Analyst and Autopilot, run: wrangler secret put ANTHROPIC_API_KEY, then redeploy.";
+      $("anBtn").after(note);
+    }
   } catch(e){ toast("Can't reach worker: " + e.message, true); resetSetup(); return; }
   refreshAccount(); refreshPositions(); refreshOrders();
   renderWatch(); select(selected);

@@ -187,6 +187,7 @@ export default {
           mode: env.MODE === "live" ? "live" : "paper",
           max_notional: Number(env.MAX_NOTIONAL || 200),
           max_trades_per_day: Number(env.MAX_TRADES_PER_DAY || 20),
+          ai_enabled: Boolean(env.ANTHROPIC_API_KEY),
         });
       }
 
@@ -251,6 +252,9 @@ export default {
       }
 
       if (path === "/api/analyze" && request.method === "POST") {
+        if (!env.ANTHROPIC_API_KEY) {
+          return json({ error: "AI analysis is disabled — set the ANTHROPIC_API_KEY secret to enable it." }, 501);
+        }
         const { symbol } = await request.json();
         const [acctRes, posRes] = await Promise.all([
           alpaca(env, tradingBase(env), "/v2/account"),

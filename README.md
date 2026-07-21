@@ -11,7 +11,7 @@ wrangler.toml→ Worker config (mode + trade caps)
 ## 1. Get accounts & keys
 
 1. **Alpaca** — sign up at alpaca.markets. Every account gets a *paper trading* environment instantly with $100k fake money. Generate API keys from the dashboard (paper keys and live keys are separate — start with paper keys).
-2. **Anthropic** — get an API key from console.anthropic.com.
+2. **Anthropic** *(optional)* — get an API key from console.anthropic.com if you want the AI Analyst + Autopilot. Skip it and tape runs as a clean manual trading terminal; the AI panel disables itself automatically.
 3. Invent an **AUTH_KEY** — any long random string. This is the password your dashboard uses so nobody else can drive your worker.
 
 ## 2. Deploy the worker
@@ -22,8 +22,8 @@ wrangler login
 cd neontrader
 wrangler secret put ALPACA_KEY
 wrangler secret put ALPACA_SECRET
-wrangler secret put ANTHROPIC_API_KEY
 wrangler secret put AUTH_KEY
+wrangler secret put ANTHROPIC_API_KEY   # optional — only for AI features
 wrangler deploy
 ```
 
