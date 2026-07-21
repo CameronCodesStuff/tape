@@ -281,7 +281,7 @@ async function boot(){
     b.className = "badge " + SERVER.mode;
     if (SERVER.mode === "live") toast("⚠ LIVE MODE — orders use real money", true);
     $("limitsNote").textContent = `Server caps: ${fmt$(SERVER.max_notional)} per order · ${SERVER.max_trades_per_day} orders/day`;
-    if (!SERVER.ai_enabled) {
+    if (SERVER.ai_enabled === false) {
       $("anBtn").disabled = true;
       $("anBtn").textContent = "AI disabled";
       $("autoTgl").disabled = true;
